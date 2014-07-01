@@ -38,35 +38,53 @@
 
 ;;; Code:
 
-(defun sqlup-insert-space-and-maybe-capitalize ()
-  (interactive)
-  (sqlup-maybe-capitalize-word-at-point)
-  (insert " "))
-
-(defun sqlup-insert-open-parens-and-maybe-capitalize ()
-  (interactive)
-  (sqlup-maybe-capitalize-word-at-point)
-  (insert "("))
-
-(defun sqlup-insert-semicolon-and-maybe-capitalize ()
-  (interactive)
-  (sqlup-maybe-capitalize-word-at-point)
-  (insert ";"))
-
 (defun sqlup-maybe-capitalize-word-at-point ()
+;;  (make-local-variable 'sqlup-keywords)
   (let ((sqlup-current-word (thing-at-point 'symbol))
         (sqlup-current-word-boundaries (bounds-of-thing-at-point 'symbol)))
-    (if (member (downcase sqlup-current-word) sqlup-keywords)
+    (if (and (stringp sqlup-current-word)
+         (member (downcase sqlup-current-word) sqlup-keywords))
         (progn
           (delete-region (car sqlup-current-word-boundaries) (cdr sqlup-current-word-boundaries))
-          (insert (upcase sqlup-current-word))
-          ))))
+          (insert (upcase sqlup-current-word))))))
+
+;; Stolen from http://www.emacswiki.org/emacs/AbbrevMode#toc5
+ (defun sqlup-in-code-context-p ()
+  (if (fboundp 'buffer-syntactic-context) ; XEmacs function.
+       (null (buffer-syntactic-context))
+     ;; Attempt to simulate buffer-syntactic-context
+     ;; I don't know how reliable this is.
+     (let* ((beg (save-excursion
+                  (beginning-of-line)
+                  (point)))
+           (list
+            (parse-partial-sexp beg (point))))
+         (and (null (nth 3 list))       ; inside string.
+              (null (nth 4 list))))))	; inside comment
+
+;;;###autoload
+(define-minor-mode sqlup-mode
+  "Capitalizes SQL keywords for you."
+  :lighter " SUP"
+  ;; :keymap (let ((map (make-sparse-keymap)))
+  ;;           (define-key map (kbd "SPC") 'sqlup-insert-space-and-maybe-capitalize)
+  ;;           (define-key map (kbd "(") 'sqlup-insert-open-parens-and-maybe-capitalize)
+  ;;           (define-key map (kbd ";") 'sqlup-insert-semicolon-and-maybe-capitalize)
+  ;;           map)
+  (make-local-variable 'pre-abbrev-expand-hook)
+  (add-hook 'pre-abbrev-expand-hook 'sqlup-foo)
+  (abbrev-mode 1)
+  )
+
+(defun sqlup-foo ()
+  (if (sqlup-in-code-context-p)
+      (sqlup-maybe-capitalize-word-at-point)))
 
 ;;;###autoload
 (defun sqlup-capitalize-keywords-in-region ()
   "Call this function on a region to capitalize the SQL keywords therein."
   (interactive)
-
+;;  (make-local-variable 'sqlup-keywords)
   (save-excursion
     (let* ((sqlup-start-of-region (region-beginning))
            (sqlup-end-of-region (region-end)))
@@ -76,15 +94,9 @@
           (if (member (downcase (match-string 0)) sqlup-keywords)
               (replace-match (upcase (match-string 0)) t t)))))))
 
-;;;###autoload
-(define-minor-mode sqlup-mode
-  "Capitalizes SQL keywords for you."
-  :lighter " SUP"
-  :keymap (let ((map (make-sparse-keymap)))
-            (define-key map (kbd "SPC") 'sqlup-insert-space-and-maybe-capitalize)
-            (define-key map (kbd "(") 'sqlup-insert-open-parens-and-maybe-capitalize)
-            (define-key map (kbd ";") 'sqlup-insert-semicolon-and-maybe-capitalize)
-            map))
+(define-abbrev-table 'sqlup-abbrev-table
+  (mapcar (lambda(keyword)
+                (list keyword (upcase keyword))) sqlup-keywords))
 
 (defvar sqlup-keywords
   '("absolute" "action" "add" "after" "all" "allocate" "alter" "and" "any" "are" "array" "as" "asc" "asensitive" "assertion" "asymmetric" "at" "atomic" "authorization" "avg" "before" "begin" "between" "bigint" "binary" "bit" "bitlength" "blob" "boolean" "both" "breadth" "by" "call" "called" "cascade" "cascaded" "case" "cast" "catalog" "char" "char_length" "character" "character_length" "check" "clob" "close" "coalesce" "collate" "collation" "column" "commit" "condition" "connect" "connection" "constraint" "constraints" "constructor" "contains" "continue" "convert" "corresponding" "count" "create" "cross" "cube" "current" "current_date" "current_default_transform_group" "current_path" "current_role" "current_time" "current_timestamp" "current_transform_group_for_type" "current_user" "cursor" "cycle" "data" "date" "day" "deallocate" "dec" "decimal" "declare" "default" "deferrable" "deferred" "delete" "depth" "deref" "desc" "describe" "descriptor" "deterministic" "diagnostics" "disconnect" "distinct" "do" "domain" "double" "drop" "dynamic" "each" "element" "else" "elseif" "end" "equals" "escape" "except" "exception" "exec" "execute" "exists" "exit" "external" "extract" "false" "fetch" "filter" "first" "float" "for" "foreign" "found" "free" "from" "full" "function" "general" "get" "global" "go" "goto" "grant" "group" "grouping" "handler" "having" "hold" "hour" "identity" "if" "immediate" "in" "indicator" "initially" "inner" "inout" "input" "insensitive" "insert" "int" "integer" "intersect" "interval" "into" "is" "isolation" "iterate" "join" "key" "language" "large" "last" "lateral" "leading" "leave" "left" "level" "like" "limit" "local" "localtime" "localtimestamp" "locator" "loop" "lower" "map" "match" "map" "member" "merge" "method" "min" "minute" "modifies" "module" "month" "multiset" "names" "national" "natural" "nchar" "nclob" "new" "next" "no" "none" "not" "null" "nullif" "numeric" "object" "octet_length" "of" "old" "on" "only" "open" "option" "or" "order" "ordinality" "out" "outer" "output" "over" "overlaps" "pad" "parameter" "partial" "partition" "path" "position" "precision" "prepare" "preserve" "primary" "prior" "privileges" "procedure" "public" "range" "read" "reads" "real" "recursive" "ref" "references" "referencing" "relative" "release" "repeat" "resignal" "restrict" "result" "return" "returns" "revoke" "right" "role" "rollback" "rollup" "routine" "row" "rows" "savepoint" "schema" "scope" "scroll" "search" "second" "section" "select" "sensitive" "session" "session_user" "set" "sets" "signal" "similar" "size" "smallint" "some" "space" "specific" "specifictype" "sql" "sqlcode" "sqlerror" "sqlexception" "sqlstate" "sqlwarning" "start" "state" "static" "submultiset" "substring" "sum" "symmetric" "system" "system_user" "table" "tablesample" "temporary" "then" "time" "timestamp" "timezone_hour" "timezone_minute" "to" "trailing" "transaction" "translate" "translation" "treat" "trigger" "trim" "true" "under" "undo" "union" "unique" "unknown" "unnest" "until" "update" "upper" "usage" "user" "using" "value" "values" "varchar" "varying" "view" "when" "whenever" "where" "while" "window" "with" "within" "without" "work" "write" "year" "zone")
